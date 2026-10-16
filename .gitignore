@@ -1,0 +1,17 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+bun.lock*
+*.log
+.env*
+!.env.example
+
+# Server-side visitor statistics
+.visitor-count.json
+
+# Private server-side credentials; never commit or distribute
+.server-admin-vault.json
+.admin-sessions.json
+.aistudio/

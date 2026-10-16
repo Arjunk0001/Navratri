@@ -1,0 +1,345 @@
+import React, { useState, useEffect } from 'react';
+import {
+  Crown,
+  ShieldCheck,
+  User,
+  Lock,
+  X,
+  AlertCircle,
+  Eye,
+  EyeOff,
+  Loader2,
+  CheckCircle2,
+  Flame,
+} from 'lucide-react';
+import { verifyDatabaseLogin, verifySuperAdminLogin } from '../firebase/dbAuth';
+import { loginWithGoogleAdmin } from '../firebase/authService';
+import { playTempleBell } from '../utils/audio';
+
+interface AdminLoginModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+  initialMode?: 'super_admin' | 'admin';
+}
+
+export const AdminPinModal: React.FC<AdminLoginModalProps> = ({
+  isOpen,
+  onClose,
+  onSuccess,
+  initialMode = 'admin',
+}) => {
+  const [activeTab, setActiveTab] = useState<'admin' | 'super_admin'>(
+    initialMode === 'super_admin' ? 'super_admin' : 'admin'
+  );
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [isShaking, setIsShaking] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      const mode = initialMode === 'super_admin' ? 'super_admin' : 'admin';
+      setActiveTab(mode);
+      setErrorMsg(null);
+      setSuccessMsg(null);
+      setUsername(mode === 'super_admin' ? 'kushwahaarjun9970' : 'admin');
+      setPassword('');
+      setShowPassword(false);
+    }
+  }, [isOpen, initialMode]);
+
+  if (!isOpen) return null;
+
+  const handleTabChange = (tab: 'admin' | 'super_admin') => {
+    playTempleBell();
+    setActiveTab(tab);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    if (!username || username === 'admin' || username === 'kushwahaarjun9970') {
+      setUsername(tab === 'super_admin' ? 'kushwahaarjun9970' : 'admin');
+    }
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const effectiveUsername = username.trim() || (activeTab === 'super_admin' ? 'kushwahaarjun9970' : 'admin');
+    if (!password.trim()) {
+      setErrorMsg('कृपया पासवर्ड या सुरक्षा पिन दर्ज करें।');
+      return;
+    }
+
+    setIsVerifying(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    const result =
+      activeTab === 'super_admin'
+        ? await verifySuperAdminLogin(effectiveUsername, password)
+        : await verifyDatabaseLogin(effectiveUsername, password);
+
+    setIsVerifying(false);
+
+    if (result.success) {
+      playTempleBell();
+      setSuccessMsg(result.message || 'सत्यापन सफल! प्रबंधन कक्ष में स्वागत है।');
+      setTimeout(() => {
+        onSuccess();
+      }, 400);
+    } else {
+      setErrorMsg(result.message || 'अमान्य क्रेडेंशियल्स! कृपया सही जानकारी दर्ज करें।');
+      setIsShaking(true);
+      setTimeout(() => setIsShaking(false), 500);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setIsVerifying(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    try {
+      const res = await loginWithGoogleAdmin();
+      setIsVerifying(false);
+      if (res.success) {
+        playTempleBell();
+        setSuccessMsg(res.message || 'Google द्वारा सत्यापन सफल! स्वागत है अर्जुन कुशवाहा।');
+        setTimeout(() => {
+          onSuccess();
+        }, 400);
+      } else {
+        setErrorMsg(res.message || 'Google लॉगिन में त्रुटि हुई।');
+        setIsShaking(true);
+        setTimeout(() => setIsShaking(false), 500);
+      }
+    } catch (err: any) {
+      setIsVerifying(false);
+      setErrorMsg('Google लॉगिन में समस्या आई: ' + (err?.message || 'त्रुटि'));
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-60 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in text-slate-800">
+      <div
+        className={`w-full max-w-md bg-[#fffdf9] border-2 border-[#d9a441] rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.6)] overflow-hidden relative ${
+          isShaking ? 'animate-shake' : ''
+        }`}
+      >
+        {/* Sacred Ornamental Header Border */}
+        <div className="h-2.5 bg-gradient-to-r from-[#5a0909] via-[#f7cb68] via-[#e5a93b] to-[#5a0909]" />
+
+        {/* Close Button */}
+        <button
+          onClick={() => {
+            playTempleBell();
+            onClose();
+          }}
+          className="absolute top-4 right-4 p-2 rounded-full text-stone-400 hover:text-stone-800 hover:bg-stone-100 transition-colors cursor-pointer"
+          aria-label="Close"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        <div className="p-6 sm:p-7">
+          {/* Sanskrit Sloka Invocation */}
+          <div className="text-center mb-2">
+            <span className="text-[11px] font-hindi tracking-widest text-[#a83232] font-semibold">
+              ॥ ॐ ऐं ह्रीं क्लीं चामुण्डायै विच्चे ॥
+            </span>
+          </div>
+
+          {/* Header Icon & Title */}
+          <div className="flex flex-col items-center text-center mb-5">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-[#3a0606] via-[#690d0d] to-[#8a1313] flex items-center justify-center text-[#ffd76a] shadow-xl border-2 border-[#d9a441]/60 mb-3 relative group">
+              <div className="absolute -inset-1 rounded-2xl bg-[#ffd76a]/20 blur-sm pointer-events-none" />
+              {activeTab === 'super_admin' ? (
+                <Crown className="w-7 h-7 text-[#ffd76a] relative z-10" />
+              ) : (
+                <ShieldCheck className="w-7 h-7 text-[#ffd76a] relative z-10" />
+              )}
+            </div>
+
+            <h3 className="font-marcellus text-xl sm:text-2xl font-bold text-[#3a0606] tracking-wide">
+              {activeTab === 'super_admin' ? 'मुख्य सुपर एडमिन कक्ष' : 'समिति व्यवस्थापक लॉगिन'}
+            </h3>
+            <p className="text-xs text-[#7c5835] mt-1 font-serif">
+              श्री शक्ति दुर्गा पूजा समिति • अधिकृत प्रबंधन एवं सुरक्षा
+            </p>
+          </div>
+
+          {/* Traditional Selector Buttons */}
+          <div className="relative flex rounded-2xl bg-[#f5ecdd] p-1.5 mb-5 border border-[#e5d8c3] shadow-inner">
+            <button
+              type="button"
+              onClick={() => handleTabChange('admin')}
+              className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                activeTab === 'admin'
+                  ? 'bg-gradient-to-r from-[#4a0808] to-[#6d0d0d] text-[#ffd76a] shadow-md border border-[#d9a441]/50'
+                  : 'text-[#6b4c2b] hover:text-[#3a0606]'
+              }`}
+            >
+              <ShieldCheck className="w-4 h-4" />
+              <span>समिति एडमिन</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleTabChange('super_admin')}
+              className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                activeTab === 'super_admin'
+                  ? 'bg-gradient-to-r from-[#4a0808] to-[#6d0d0d] text-[#ffd76a] shadow-md border border-[#d9a441]/50'
+                  : 'text-[#6b4c2b] hover:text-[#3a0606]'
+              }`}
+            >
+              <Crown className="w-4 h-4" />
+              <span>सुपर एडमिन</span>
+            </button>
+          </div>
+
+          {/* Form */}
+          <form onSubmit={handleLogin} className="space-y-4">
+            {/* Username Input */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-bold text-[#4a0808]">
+                  {activeTab === 'super_admin' ? 'सुपर एडमिन यूज़रनेम' : 'समिति एडमिन यूज़रनेम'}
+                </label>
+                <span className="text-[10px] text-[#8c673d] font-mono">
+                  {activeTab === 'super_admin' ? 'Master UID' : 'Admin ID'}
+                </span>
+              </div>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#b4832c]">
+                  <User className="w-4 h-4" />
+                </div>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder={
+                    activeTab === 'super_admin'
+                      ? 'सुपर एडमिन यूज़रनेम दर्ज करें'
+                      : 'समिति एडमिन यूज़रनेम दर्ज करें'
+                  }
+                  className="w-full pl-10 pr-3 py-2.5 bg-[#fdfbf7] border border-[#e2d2b8] rounded-xl text-sm font-medium text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-[#d9a441] focus:bg-white transition-all font-mono"
+                  autoFocus
+                  autoCapitalize="none"
+                />
+              </div>
+            </div>
+
+            {/* Password Input */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-bold text-[#4a0808]">
+                  {activeTab === 'super_admin' ? 'सुपर एडमिन गुप्त पासवर्ड' : 'समिति एडमिन पासवर्ड'}
+                </label>
+                <span className="text-[10px] text-[#9a3412] font-semibold">
+                  {activeTab === 'super_admin' ? '🔒 सर्वोच्च अधिकार' : '🛡️ पंडाल व्यवस्था'}
+                </span>
+              </div>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#b4832c]">
+                  <Lock className="w-4 h-4" />
+                </div>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder={
+                    activeTab === 'super_admin'
+                      ? 'सुपर एडमिन पासवर्ड दर्ज करें'
+                      : 'समिति एडमिन पासवर्ड दर्ज करें'
+                  }
+                  className="w-full pl-10 pr-10 py-2.5 bg-[#fdfbf7] border border-[#e2d2b8] rounded-xl text-sm font-medium text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-[#d9a441] focus:bg-white transition-all font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-stone-400 hover:text-stone-700 cursor-pointer"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Error Message */}
+            {errorMsg && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 flex items-start gap-2 animate-fade-in shadow-xs">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-600" />
+                <span className="leading-tight font-medium">{errorMsg}</span>
+              </div>
+            )}
+
+            {/* Success Message */}
+            {successMsg && (
+              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-start gap-2 animate-fade-in shadow-xs">
+                <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-emerald-600" />
+                <span className="font-semibold leading-tight">{successMsg}</span>
+              </div>
+            )}
+
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={isVerifying}
+              className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-[#4a0808] via-[#750e0e] to-[#4a0808] hover:from-[#5e0c0c] hover:to-[#5e0c0c] text-[#ffd76a] font-bold text-sm shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mt-2 border border-[#d9a441]/40"
+            >
+              {isVerifying ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-[#ffd76a]" />
+                  <span>सुरक्षा सत्यापन हो रहा है...</span>
+                </>
+              ) : (
+                <>
+                  <Flame className="w-4 h-4 text-[#ffd76a]" />
+                  <span>
+                    {activeTab === 'super_admin'
+                      ? 'सुपर एडमिन सत्यापन एवं प्रवेश'
+                      : 'समिति प्रबंधन में प्रवेश'}
+                  </span>
+                </>
+              )}
+            </button>
+
+            {activeTab === 'super_admin' && (
+              <div className="pt-2">
+                <div className="relative flex py-2 items-center">
+                  <div className="flex-grow border-t border-stone-200"></div>
+                  <span className="flex-shrink mx-3 text-[10px] text-stone-400 font-semibold uppercase">या फिर</span>
+                  <div className="flex-grow border-t border-stone-200"></div>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={isVerifying}
+                  onClick={handleGoogleLogin}
+                  className="w-full py-2.5 px-4 rounded-xl bg-white hover:bg-stone-50 border border-stone-300 text-stone-700 font-semibold text-xs shadow-xs hover:shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                  </svg>
+                  <span>Google से 1-क्लिक सुपर एडमिन लॉगिन</span>
+                </button>
+              </div>
+            )}
+          </form>
+
+          {/* Traditional Confidentiality Footer */}
+          <div className="mt-5 pt-3.5 border-t border-[#e8ddcb] flex items-center justify-between text-[11px] text-[#7c5835]">
+            <span className="flex items-center gap-1">
+              <span>🛡️</span>
+              <span>256-बिट सुरक्षित एन्क्रिप्शन</span>
+            </span>
+            <span className="font-semibold text-[#8a1313]">शून्य सहिष्णुता सुरक्षा नीति</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
