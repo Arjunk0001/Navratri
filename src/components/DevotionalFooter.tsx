@@ -83,17 +83,11 @@ export const DevotionalFooter: React.FC<DevotionalFooterProps> = ({
           </div>
         </div>
 
-        {/* Cumulative Live Devotee Visitor Counter Badge */}
-        {typeof visitorCount === 'number' && visitorCount > 0 && (
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#2a0404]/90 border border-[#d9a441]/50 text-[#ffd76a] text-xs font-semibold shadow-md mb-5">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span>कुल दर्शनार्थी (Total Devotees Visited): <strong className="text-white text-sm font-bold tracking-wider">{visitorCount.toLocaleString('en-IN')}</strong></span>
-          </div>
-        )}
+        
 
         {/* Samiti Rights & Information */}
         <div className="text-[11px] text-[#cca574] space-y-1">
-          <p>© 2026 {pandalName || 'श्री शक्ति दुर्गा पूजा समिति'} • {pandalLocation || 'अखिल भारतीय डिजिटल नेटवर्क'}</p>
+          <p>© 2026 {pandalName || 'श्री सर्वजनिक दुर्गा पूजा समिति'} • {pandalLocation || 'अखिल भारतीय डिजिटल नेटवर्क'}</p>
           <p className="text-[10px] text-[#ffd76a]/60">
             {/* मल्टी-वेबसाइट प्लेटफॉर्म • केंद्रीयकृत सुरक्षित डेटाबेस द्वारा संचालित */}
           </p>
