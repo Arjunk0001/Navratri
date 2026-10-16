@@ -28,8 +28,8 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.json({ limit: '25mb' }));
-app.use(express.urlencoded({ extended: true, limit: '25mb' }));
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 
 // Read Firebase Config for Firestore Database access
 let firebaseConfig: any = null;
@@ -941,22 +941,25 @@ app.post('/api/admin/update-pin', async (req: Request, res: Response) => {
   });
 });
 
-// CLOUDINARY SECURE IMAGE UPLOAD PROXY ENDPOINT (PROTECTED)
-app.post('/api/upload-image', requireAdminAuth, async (req: Request, res: Response) => {
+// CLOUDINARY SECURE MEDIA (IMAGE / VIDEO) UPLOAD PROXY ENDPOINTS (PROTECTED)
+app.post(['/api/upload-image', '/api/upload-media'], requireAdminAuth, async (req: Request, res: Response) => {
   try {
-    const { image, folder = 'durga_puja_2026' } = req.body;
-    if (!image) {
-      return res.status(400).json({ success: false, message: 'कृपया इमेज डेटा प्रदान करें।' });
+    const media = req.body.media || req.body.image;
+    const folder = req.body.folder || 'durga_puja_2026';
+    const resourceType = req.body.resourceType || (typeof media === 'string' && media.startsWith('data:video/') ? 'video' : 'image');
+
+    if (!media) {
+      return res.status(400).json({ success: false, message: 'कृपया मीडिया (फोटो/वीडियो) डेटा प्रदान करें।' });
     }
 
-    const cloudinaryEndpoint = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
+    const cloudinaryEndpoint = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/${resourceType === 'video' ? 'video' : 'image'}/upload`;
     const response = await fetch(cloudinaryEndpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        file: image,
+        file: media,
         upload_preset: CLOUDINARY_UPLOAD_PRESET,
         folder,
       }),
@@ -967,7 +970,7 @@ app.post('/api/upload-image', requireAdminAuth, async (req: Request, res: Respon
     if (!response.ok) {
       return res.status(response.status).json({
         success: false,
-        message: data.error?.message || 'Cloudinary पर इमेज अपलोड असफल रही।',
+        message: data.error?.message || 'Cloudinary पर मीडिया अपलोड असफल रहा।',
       });
     }
 
@@ -979,13 +982,14 @@ app.post('/api/upload-image', requireAdminAuth, async (req: Request, res: Respon
       height: data.height,
       format: data.format,
       bytes: data.bytes,
-      message: 'Cloudinary CDN पर इमेज सफलतापूर्वक और सुरक्षित अपलोड हो गई!',
+      resourceType: data.resource_type || resourceType,
+      message: 'Cloudinary CDN पर मीडिया सफलतापूर्वक और सुरक्षित अपलोड हो गया!',
     });
   } catch (err: any) {
-    console.error('Error in /api/upload-image:', err);
+    console.error('Error in /api/upload-media:', err);
     return res.status(500).json({
       success: false,
-      message: 'सर्वर पर इमेज अपलोड के दौरान त्रुटि आई: ' + (err.message || 'Unknown error'),
+      message: 'सर्वर पर मीडिया अपलोड के दौरान त्रुटि आई: ' + (err.message || 'Unknown error'),
     });
   }
 });

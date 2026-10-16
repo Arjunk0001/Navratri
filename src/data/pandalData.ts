@@ -67,6 +67,8 @@ export interface FeaturedMedia {
   url: string;
   title?: string;
   subtitle?: string;
+  linkUrl?: string;
+  linkText?: string;
 }
 
 export interface PandalData {

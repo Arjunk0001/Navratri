@@ -41,6 +41,7 @@ import {
   Globe,
   Building2,
   Crown,
+  Link as LinkIcon,
 } from 'lucide-react';
 import {
   PandalData,
@@ -59,7 +60,7 @@ import {
   deleteInquiry,
 } from '../utils/inquiryStorage';
 import { playTempleBell } from '../utils/audio';
-import { uploadImageToCloudinary } from '../utils/imageUpload';
+import { uploadImageToCloudinary, uploadMediaToCloudinary } from '../utils/imageUpload';
 import {
   setSamitiAdminAuthenticated,
   updateAdminPin,
@@ -432,7 +433,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [draftMediaUrl, setDraftMediaUrl] = useState(pandalState.featuredMedia?.url ?? '');
   const [draftMediaTitle, setDraftMediaTitle] = useState(pandalState.featuredMedia?.title ?? '');
   const [draftMediaSubtitle, setDraftMediaSubtitle] = useState(pandalState.featuredMedia?.subtitle ?? '');
+  const [draftMediaLinkUrl, setDraftMediaLinkUrl] = useState(pandalState.featuredMedia?.linkUrl ?? '');
+  const [draftMediaLinkText, setDraftMediaLinkText] = useState(pandalState.featuredMedia?.linkText ?? '');
   const mediaFileInputRef = useRef<HTMLInputElement>(null);
+  const videoFileInputRef = useRef<HTMLInputElement>(null);
 
   // Sync draft pandal data when opened
   React.useEffect(() => {
@@ -463,6 +467,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       setDraftMediaUrl(pandalState.featuredMedia?.url ?? '');
       setDraftMediaTitle(pandalState.featuredMedia?.title ?? '');
       setDraftMediaSubtitle(pandalState.featuredMedia?.subtitle ?? '');
+      setDraftMediaLinkUrl(pandalState.featuredMedia?.linkUrl ?? '');
+      setDraftMediaLinkText(pandalState.featuredMedia?.linkText ?? '');
     }
   }, [isOpen, pandalState]);
 
@@ -486,33 +492,37 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     showToast(feedback);
   };
 
-  // Helper for uploading image to Cloudinary CDN with fallback
+  // Helper for uploading image or video to Cloudinary CDN with fallback
   const handleCloudinaryUpload = async (
     e: React.ChangeEvent<HTMLInputElement>,
     setter: (url: string) => void,
-    section: 'gallery' | 'hero' | 'volunteer' | 'media'
+    section: 'gallery' | 'hero' | 'volunteer' | 'media',
+    resourceType: 'auto' | 'image' | 'video' = 'image'
   ) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 20 * 1024 * 1024) {
-      alert('कृपया 20MB से छोटी इमेज चुनें (Please select image under 20MB)');
+    const isVideo = resourceType === 'video' || file.type.startsWith('video/');
+    const maxSize = isVideo ? 100 * 1024 * 1024 : 25 * 1024 * 1024;
+
+    if (file.size > maxSize) {
+      alert(isVideo ? 'कृपया 100MB से छोटा वीडियो चुनें (Video size should be under 100MB)' : 'कृपया 25MB से छोटी इमेज चुनें (Image size under 25MB)');
       return;
     }
 
     setUploadingSection(section);
     try {
-      const res = await uploadImageToCloudinary(file, 'durga_puja_2026');
+      const res = await uploadMediaToCloudinary(file, isVideo ? 'video' : 'image', 'durga_puja_2026');
       if (res.success && res.url) {
         setter(res.url);
-        showToast('☁️ Cloudinary CDN पर सुरक्षित अपलोड सफल!');
+        showToast(isVideo ? '🎬 वीडियो Cloudinary CDN पर सुरक्षित अपलोड हो गया!' : '☁️ Cloudinary CDN पर सुरक्षित अपलोड सफल!');
       } else {
         // Fallback to FileReader if Cloudinary fails
         const reader = new FileReader();
         reader.onload = (event) => {
           if (event.target?.result) {
             setter(event.target.result as string);
-            showToast('लोकल स्टोरेज में फोटो लोड हो गई (फ़ॉलबैक)');
+            showToast(isVideo ? 'लोकल वीडियो लोड हो गया (फ़ॉलबैक)' : 'लोकल स्टोरेज में फोटो लोड हो गई (फ़ॉलबैक)');
           }
         };
         reader.readAsDataURL(file);
@@ -539,6 +549,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         url: draftMediaUrl.trim(),
         title: draftMediaTitle.trim(),
         subtitle: draftMediaSubtitle.trim(),
+        linkUrl: draftMediaLinkUrl.trim(),
+        linkText: draftMediaLinkText.trim(),
       },
     };
     handleCommitPandalData(updated, 'विशेष मीडिया (Featured Media) सफलतापूर्वक वेबसाइट पर सेव हो गया!');
@@ -553,6 +565,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     setDraftMediaUrl('');
     setDraftMediaTitle('');
     setDraftMediaSubtitle('');
+    setDraftMediaLinkUrl('');
+    setDraftMediaLinkText('');
     const updated: PandalData = {
       ...pandalState,
       featuredMedia: {
@@ -561,6 +575,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         url: '',
         title: '',
         subtitle: '',
+        linkUrl: '',
+        linkText: '',
       },
     };
     handleCommitPandalData(updated, 'विशेष मीडिया हटा दिया गया है। मुख्य पेज से स्पेस पूरी तरह खाली हो गया!');
@@ -1973,59 +1989,89 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     </button>
                   </div>
 
-                  {/* Media URL Input & Cloudinary Upload */}
-                  <div>
-                    <label className="block text-xs font-bold text-[#7a1c1c] mb-1">
-                      {draftMediaType === 'video'
-                        ? 'वीडियो URL (YouTube Embed / Watch Link / MP4 / Cloudinary Video) *'
-                        : 'फोटो URL (Image Link / Cloudinary URL) *'}
-                    </label>
-                    <div className="flex gap-2">
+                  {/* Media Upload & URL Configuration */}
+                  <div className="p-4 rounded-xl bg-amber-50/40 border border-amber-200 space-y-3">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <label className="block text-xs font-bold text-[#7a1c1c]">
+                        {draftMediaType === 'video'
+                          ? '1. वीडियो फ़ाइल या URL (Video Upload from Gallery / Direct Link) *'
+                          : '1. फोटो फ़ाइल या URL (Photo Upload from Gallery / Direct Link) *'}
+                      </label>
+                      <span className="text-[11px] text-amber-800 font-medium">
+                        {draftMediaType === 'video' ? '🎬 गैलरी से MP4, WebM या वीडियो चुनें' : '🖼️ गैलरी से फोटो चुनें'}
+                      </span>
+                    </div>
+
+                    {/* Hidden Native File Inputs */}
+                    <input
+                      ref={videoFileInputRef}
+                      type="file"
+                      accept="video/mp4,video/webm,video/quicktime,video/*"
+                      className="hidden"
+                      onChange={(e) =>
+                        handleCloudinaryUpload(e, (url) => setDraftMediaUrl(url), 'media', 'video')
+                      }
+                    />
+                    <input
+                      ref={mediaFileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) =>
+                        handleCloudinaryUpload(e, (url) => setDraftMediaUrl(url), 'media', 'image')
+                      }
+                    />
+
+                    {/* Gallery Choose Button & URL Input Row */}
+                    <div className="flex flex-col sm:flex-row gap-2.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (draftMediaType === 'video') {
+                            videoFileInputRef.current?.click();
+                          } else {
+                            mediaFileInputRef.current?.click();
+                          }
+                        }}
+                        disabled={uploadingSection === 'media'}
+                        className="px-5 py-3 rounded-xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer whitespace-nowrap disabled:opacity-50 shrink-0"
+                      >
+                        {uploadingSection === 'media' ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin text-amber-200" />
+                            <span>
+                              {draftMediaType === 'video' ? 'वीडियो अपलोड हो रहा है...' : 'फोटो अपलोड हो रही है...'}
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="w-4 h-4 text-amber-200" />
+                            <span>
+                              {draftMediaType === 'video' ? '📁 गैलरी से वीडियो चुनें (Choose Video)' : '📁 गैलरी से फोटो चुनें (Choose Photo)'}
+                            </span>
+                          </>
+                        )}
+                      </button>
+
                       <input
                         type="url"
                         value={draftMediaUrl}
                         onChange={(e) => setDraftMediaUrl(e.target.value)}
                         placeholder={
                           draftMediaType === 'video'
-                            ? 'https://www.youtube.com/watch?v=... या https://...mp4'
-                            : 'https://images.unsplash.com/... या Cloudinary URL'
+                            ? 'या वीडियो लिंक पेस्ट करें: https://...mp4 या YouTube Link'
+                            : 'या इमेज लिंक पेस्ट करें: https://...'
                         }
-                        className="flex-1 px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#d9a441] focus:bg-white"
+                        className="flex-1 px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#d9a441]"
                       />
-
-                      {/* Direct Upload Button for Image */}
-                      {draftMediaType === 'image' && (
-                        <div>
-                          <input
-                            ref={mediaFileInputRef}
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(e) =>
-                              handleCloudinaryUpload(e, (url) => setDraftMediaUrl(url), 'media')
-                            }
-                          />
-                          <button
-                            type="button"
-                            onClick={() => mediaFileInputRef.current?.click()}
-                            disabled={uploadingSection === 'media'}
-                            className="px-4 py-2.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap disabled:opacity-50"
-                          >
-                            {uploadingSection === 'media' ? (
-                              <>
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                <span>अपलोड हो रहा है...</span>
-                              </>
-                            ) : (
-                              <>
-                                <Upload className="w-3.5 h-3.5" />
-                                <span>अपलोड करें</span>
-                              </>
-                            )}
-                          </button>
-                        </div>
-                      )}
                     </div>
+
+                    {draftMediaUrl && (
+                      <p className="text-[11px] text-emerald-700 font-mono break-all flex items-center gap-1">
+                        <Check className="w-3.5 h-3.5 shrink-0" />
+                        <span>सक्रिय मीडिया स्रोत: {draftMediaUrl.slice(0, 80)}{draftMediaUrl.length > 80 ? '...' : ''}</span>
+                      </p>
+                    )}
                   </div>
 
                   {/* Title & Subtitle */}
@@ -2056,36 +2102,91 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     </div>
                   </div>
 
-                  {/* Live Preview Box */}
+                  {/* Clickable Link Attachment to Video/Media */}
+                  <div className="p-4 rounded-xl bg-[#faf8f5] border border-[#e5d8c3] space-y-3">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-2 text-xs font-bold text-[#801313]">
+                        <LinkIcon className="w-4 h-4 text-[#d97706]" />
+                        <span>वीडियो / मीडिया पर लिंक लगाएं (Attach Clickable Link)</span>
+                      </div>
+                      <span className="text-[11px] text-slate-500">
+                        दर्शकों के लिए वीडियो के साथ यह लिंक बटन प्रदर्शित होगा
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                          लिंक URL (Target Link URL)
+                        </label>
+                        <input
+                          type="url"
+                          value={draftMediaLinkUrl}
+                          onChange={(e) => setDraftMediaLinkUrl(e.target.value)}
+                          placeholder="उदा: https://youtube.com/live/... या Instagram, दान या वेबसाइट लिंक"
+                          className="w-full px-3.5 py-2 rounded-xl bg-white border border-[#d8c7ad] text-xs sm:text-sm font-mono text-slate-800 focus:outline-none focus:border-[#d97706]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                          लिंक बटन का नाम (Button Label)
+                        </label>
+                        <input
+                          type="text"
+                          value={draftMediaLinkText}
+                          onChange={(e) => setDraftMediaLinkText(e.target.value)}
+                          placeholder="उदा: लाइव आरती देखें / Watch Live / दान करें"
+                          className="w-full px-3.5 py-2 rounded-xl bg-white border border-[#d8c7ad] text-xs sm:text-sm text-slate-800 focus:outline-none focus:border-[#d97706]"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Live Preview Box with Native Ratio */}
                   {draftMediaUrl && draftMediaUrl.trim() && (
-                    <div className="p-4 rounded-xl bg-slate-900 text-white border border-slate-700">
-                      <div className="flex items-center justify-between mb-2">
+                    <div className="p-4 rounded-xl bg-slate-900 text-white border border-slate-700 space-y-3">
+                      <div className="flex items-center justify-between">
                         <span className="text-xs font-bold text-[#ffd76a] flex items-center gap-1">
-                          <Eye className="w-3.5 h-3.5" /> लाइव पूर्वावलोकन (Preview)
+                          <Eye className="w-3.5 h-3.5" /> लाइव पूर्वावलोकन (Preview - मूल रेशियो में)
                         </span>
                         <span className="text-[10px] text-slate-400 font-mono">
-                          {draftMediaType === 'video' ? 'Video Player' : 'Image'}
+                          {draftMediaType === 'video' ? 'Autoplay Video (Native Aspect Ratio)' : 'Image'}
                         </span>
                       </div>
-                      <div className="rounded-lg overflow-hidden max-h-[300px] flex items-center justify-center bg-black/60">
+
+                      <div className="rounded-xl overflow-hidden bg-black/80 flex flex-col items-center justify-center p-2 border border-slate-800">
                         {draftMediaType === 'video' ? (
                           draftMediaUrl.includes('youtube') || draftMediaUrl.includes('youtu.be') ? (
                             <p className="p-6 text-xs text-amber-200 font-medium text-center">
-                              ▶️ YouTube लिंक सुरक्षित है: {draftMediaUrl} (वेबसाइट पर सीधे एम्बेड होकर चलेगा)
+                              ▶️ YouTube लिंक सुरक्षित है: {draftMediaUrl} (वेबसाइट पर सीधे एम्बेड होकर स्वतः चलेगा)
                             </p>
                           ) : (
                             <video
                               src={draftMediaUrl}
                               controls
-                              className="max-h-[280px] w-full object-contain"
+                              autoPlay
+                              muted
+                              playsInline
+                              loop
+                              className="max-h-[360px] w-auto max-w-full rounded-lg object-contain shadow-md"
                             />
                           )
                         ) : (
                           <img
                             src={draftMediaUrl}
                             alt="Preview"
-                            className="max-h-[280px] w-full object-contain"
+                            className="max-h-[360px] w-auto max-w-full rounded-lg object-contain shadow-md"
                           />
+                        )}
+
+                        {draftMediaLinkUrl && (
+                          <div className="mt-3">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-[#ffd76a] border border-[#ffd76a]/30 text-xs font-medium">
+                              <LinkIcon className="w-3 h-3" />
+                              <span>बटन: {draftMediaLinkText || 'लिंक खोलें'}</span>
+                              <ExternalLink className="w-3 h-3 opacity-70" />
+                            </span>
+                          </div>
                         )}
                       </div>
                     </div>
